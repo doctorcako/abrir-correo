@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Abrir en Gmail</title>
+<style>
+  :root { color-scheme: light dark; --ink: #1c1b1a; --soft: #6b6762; --ground: #faf8f5; --line: #e4dfd8; --accent: #c2410c; }
+  @media (prefers-color-scheme: dark) { :root { --ink: #f3efe9; --soft: #a8a29b; --ground: #171513; --line: #33302c; --accent: #fb923c; } }
+  * { box-sizing: border-box; }
+  /* Sin esto, el display de .btn gana al atributo hidden y los botones ocultos se siguen viendo. */
+  [hidden] { display: none !important; }
+  body { margin: 0; background: var(--ground); color: var(--ink); font: 17px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 30rem; margin: 0 auto; padding: 2.5rem 1.25rem; }
+  h1 { font-size: 1.5rem; margin: 0 0 .5rem; }
+  #who { color: var(--soft); margin: 0 0 1.75rem; overflow-wrap: anywhere; }
+  .btn { display: block; width: 100%; padding: .95rem 1rem; margin: 0 0 .75rem; border-radius: .75rem; border: 1px solid var(--accent);
+         background: var(--accent); color: #fff; font: inherit; font-weight: 600; text-align: center; text-decoration: none; cursor: pointer; }
+  .btn.alt { background: transparent; color: var(--ink); border-color: var(--line); font-weight: 500; }
+  #hint, #empty { color: var(--soft); font-size: .9rem; margin: 1.25rem 0 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Abrir en Gmail</h1>
+  <p id="who"></p>
+  <a id="gmail" class="btn" href="#">Abrir en Gmail</a>
+  <a id="mail" class="btn alt" href="#">Abrir en otra app de correo</a>
+  <button id="copy" class="btn alt" type="button">Copiar el mensaje</button>
+  <p id="hint">Si al pulsar no pasa nada, abre esta página en el navegador del móvil (menú ⋯ o el icono de compartir) y vuelve a pulsar.</p>
+  <p id="empty" hidden>Este enlace no trae ningún mensaje.</p>
+</main>
+<script>
+// El mensaje viaja tras la almohadilla del enlace: el navegador no envía esa parte al
+// servidor, así que esta página nunca recibe ni guarda nada.
+(function () {
+  var data = new URLSearchParams(location.hash.slice(1));
+  var to = data.get('to') || '', subject = data.get('su') || '', body = data.get('body') || '';
+  var noauto = new URLSearchParams(location.search).has('noauto');
+  var el = function (id) { return document.getElementById(id); };
+
+  if (!to) {
+    ['gmail', 'mail', 'copy', 'hint', 'who'].forEach(function (id) { el(id).hidden = true; });
+    el('empty').hidden = false;
+    return;
+  }
+
+  var rest = 'subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  var mailto = 'mailto:' + encodeURIComponent(to).replace(/%40/g, '@') + '?' + rest;
+  var ua = navigator.userAgent;
+  var ios = /iPhone|iPad|iPod/.test(ua);
+  var android = /Android/.test(ua);
+
+  // iPhone: la app de Gmail tiene su propio tipo de enlace. Android: mailto, que el móvil
+  // entrega a su app de correo (Gmail). Ordenador: Gmail en la web, donde ya hay sesión.
+  var gmail = ios ? 'googlegmail://co?to=' + encodeURIComponent(to) + '&' + rest
+            : android ? mailto
+            : 'https://mail.google.com/mail/?view=cm&fs=1&to=' + encodeURIComponent(to) +
+              '&su=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+
+  el('who').textContent = 'Para ' + to + (subject ? ' · ' + subject : '');
+  el('gmail').href = gmail;
+  el('mail').href = mailto;
+  el('mail').hidden = (gmail === mailto);
+
+  el('copy').addEventListener('click', function () {
+    var text = (subject ? subject + '\n\n' : '') + body;
+    var done = function () { el('copy').textContent = 'Copiado'; };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    } else {
+      var area = document.createElement('textarea');
+      area.value = text; document.body.appendChild(area); area.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      area.remove();
+    }
+  });
+
+  // Se intenta abrir solo; si el navegador exige una pulsación, quedan los botones.
+  if (!noauto) { setTimeout(function () { location.href = gmail; }, 150); }
+})();
+</script>
+</body>
+</html>
